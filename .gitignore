@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+build.zip
+*.exe
+*.blob
+.env
+.env.local
+server/data/*.json
+server/data/
+*.log
+.DS_Store
