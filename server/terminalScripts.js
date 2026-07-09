@@ -63,8 +63,15 @@ export function removeScript(id, user) {
 }
 
 // ─── Session logs ──────────────────────────────────────────────────────────
+// Sanitiza um componente de nome de arquivo. Usa um único passe linear (troca
+// caracteres inválidos por '_') e apara os '_' das pontas com laços simples —
+// evita regex com quantificadores que poderiam sofrer ReDoS em entrada hostil.
 function sanitize(p) {
-  return String(p || '').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'na';
+  const s = String(p || '').replace(/[^A-Za-z0-9._-]/g, '_');
+  let a = 0, b = s.length;
+  while (a < b && s.charCodeAt(a) === 95) a++;       // 95 = '_'
+  while (b > a && s.charCodeAt(b - 1) === 95) b--;
+  return s.slice(a, b).slice(0, 60) || 'na';
 }
 const p2 = (n) => String(n).padStart(2, '0');
 

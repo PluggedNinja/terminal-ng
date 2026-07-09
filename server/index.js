@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { seedAdmin, authRouter, requireAuth } from './auth.js';
 import { hostsRouter } from './hosts.js';
 import { aiRouter } from './ai.js';
@@ -83,6 +84,13 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb' }));
 
+// ── Rate limiting ──
+// Limite geral por IP em toda a API (protege contra abuso/scraping/DoS leve).
+// Generoso para não atrapalhar o uso normal; o login tem um limite bem mais
+// estrito no próprio auth.js. Também aplicado ao fallback da SPA (abaixo).
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 1000, standardHeaders: true, legacyHeaders: false });
+app.use('/api', apiLimiter);
+
 const auth = requireAuth(JWT_SECRET);
 
 app.get('/api/health', (req, res) => res.json({ ok: true, service: 'terminal-ng', time: new Date().toISOString() }));
@@ -104,8 +112,8 @@ const distCandidates = [
 const DIST = distCandidates.find((d) => { try { return fs.existsSync(path.join(d, 'index.html')); } catch { return false; } }) || distCandidates[0];
 if (fs.existsSync(DIST)) {
   app.use(express.static(DIST));
-  // SPA fallback for any non-API GET route.
-  app.get(/^(?!\/api|\/ws).*/, (req, res) => res.sendFile(path.join(DIST, 'index.html')));
+  // SPA fallback for any non-API GET route (rate-limited como o resto).
+  app.get(/^(?!\/api|\/ws).*/, apiLimiter, (req, res) => res.sendFile(path.join(DIST, 'index.html')));
   console.log('[Static] Serving built frontend from dist/');
 } else {
   console.log('[Static] No dist/ build found — run "npm run build" to serve the UI from this port.');

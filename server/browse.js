@@ -83,14 +83,22 @@ export function browseRouter(jwtSecret) {
 
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT);
+    const fetchHeaders = { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/*,*/*;q=0.8', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8' };
     try {
-      const r = await fetch(target.href, {
-        signal: ac.signal,
-        redirect: 'follow',
-        headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/*,*/*;q=0.8', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8' },
-      });
+      // Segue redirects MANUALMENTE, revalidando cada salto contra o anti-SSRF:
+      // um site público não pode nos redirecionar para um IP interno (loopback,
+      // rede privada, metadata de cloud). Máx. 5 saltos.
+      let currentUrl = target.href;
+      let r;
+      for (let hop = 0; ; hop++) {
+        r = await fetch(currentUrl, { signal: ac.signal, redirect: 'manual', headers: fetchHeaders });
+        const loc = (r.status >= 300 && r.status < 400) ? r.headers.get('location') : null;
+        if (!loc) break;
+        if (hop >= 5) throw new Error('Muitos redirecionamentos.');
+        currentUrl = await assertPublicUrl(new URL(loc, currentUrl).href);
+      }
       clearTimeout(timer);
-      const finalUrl = r.url || target.href;
+      const finalUrl = currentUrl;
       const ct = (r.headers.get('content-type') || '').toLowerCase();
       // cabeçalhos que impediriam o iframe / cache
       res.removeHeader('X-Frame-Options');
