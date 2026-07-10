@@ -34,6 +34,7 @@ import jwt from 'jsonwebtoken';
 import { assertPublicUrl } from './net-guard.js';
 import { parseCookies, COOKIE_NAME } from './auth.js';
 import { verifyHostKey } from './hostkeys.js';
+import { isAllowedKeyPath } from './keypath.js';
 
 const activeSessions = new Map();
 const WS_PING_INTERVAL = 20000;
@@ -184,6 +185,12 @@ export function attachTerminalWebSocket(server, jwtSecret) {
 
 function resolvePrivateKey(keyPath) {
   if (!keyPath) return null;
+  // Confinamento: só lê chaves dentro dos diretórios permitidos (ver keypath.js).
+  // Evita usar o keyPath como primitiva de leitura arbitrária de arquivos do servidor.
+  if (!isAllowedKeyPath(keyPath)) {
+    console.error(`[Terminal WS] keyPath fora dos diretórios permitidos, recusado: ${keyPath}`);
+    return null;
+  }
   try {
     const stat = fs.statSync(keyPath);
     if (stat.isFile()) return { keyData: fs.readFileSync(keyPath), keyFile: keyPath };
@@ -219,7 +226,9 @@ function handleAuth(ws, msg, authTimeout, onSuccess) {
   if (keyPath) {
     const resolved = resolvePrivateKey(keyPath);
     if (resolved) { privateKeyData = resolved.keyData; resolvedKeyFile = resolved.keyFile; }
-    else { sendJson(ws, { type: 'error', message: `Key not found at: ${keyPath}` }); return; }
+    // Mensagem genérica de propósito: não distingue "inexistente" de "fora do
+    // diretório permitido" de "formato inválido" — evita virar oráculo de arquivos.
+    else { sendJson(ws, { type: 'error', message: 'Não foi possível usar a chave no caminho informado (verifique se existe e está dentro do diretório de chaves permitido).' }); return; }
   }
 
   const authMethod = privateKeyData ? 'key' : 'password';

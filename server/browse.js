@@ -9,13 +9,57 @@
  * na query (?token=), verificado aqui.
  */
 import express from 'express';
+import http from 'node:http';
+import https from 'node:https';
+import zlib from 'node:zlib';
 import jwt from 'jsonwebtoken';
-import { assertPublicUrl } from './net-guard.js';
+import { assertPublicUrl, guardedLookup } from './net-guard.js';
 import { parseCookies, COOKIE_NAME } from './auth.js';
 
 const MAX_BYTES = 12 * 1024 * 1024; // 12 MB
 const FETCH_TIMEOUT = 15000;
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+
+// Cliente HTTP(S) com lookup guardado: valida o IP na conexão (anti DNS rebinding),
+// NÃO segue redirects (tratados manualmente com revalidação) e descomprime a resposta.
+// Devolve um objeto compatível com o subconjunto de Response usado abaixo.
+function guardedGet(rawUrl, { headers, signal } = {}) {
+  return new Promise((resolve, reject) => {
+    let u;
+    try { u = new URL(rawUrl); } catch { return reject(new Error('URL inválida.')); }
+    const mod = u.protocol === 'https:' ? https : http;
+    const req = mod.request(u, { method: 'GET', headers: { ...headers, 'Accept-Encoding': 'gzip, deflate, br' }, lookup: guardedLookup }, (res) => {
+      const chunks = []; let total = 0; let killed = false;
+      res.on('data', (c) => {
+        if (killed) return;
+        total += c.length;
+        if (total > MAX_BYTES + 65536) { killed = true; try { req.destroy(); } catch {} return; }
+        chunks.push(c);
+      });
+      res.on('end', () => {
+        let buf = Buffer.concat(chunks);
+        const enc = String(res.headers['content-encoding'] || '').toLowerCase();
+        try {
+          if (enc.includes('br')) buf = zlib.brotliDecompressSync(buf);
+          else if (enc.includes('gzip')) buf = zlib.gunzipSync(buf);
+          else if (enc.includes('deflate')) buf = zlib.inflateSync(buf);
+        } catch { /* mantém como veio */ }
+        resolve({
+          status: res.statusCode || 0,
+          headers: { get: (k) => { const v = res.headers[String(k).toLowerCase()]; return Array.isArray(v) ? v[0] : (v ?? null); } },
+          async text() { return buf.toString('utf8'); },
+          async arrayBuffer() { return buf; },
+        });
+      });
+    });
+    req.on('error', (e) => reject(e));
+    if (signal) {
+      if (signal.aborted) { try { req.destroy(); } catch {} const e = new Error('Abortado'); e.name = 'AbortError'; return reject(e); }
+      signal.addEventListener('abort', () => { const e = new Error('Abortado'); e.name = 'AbortError'; try { req.destroy(e); } catch {} }, { once: true });
+    }
+    req.end();
+  });
+}
 
 function escapeAttr(s) { return String(s).replace(/"/g, '%22'); }
 // Escapa texto para inserção segura em HTML (evita XSS refletido nas páginas de erro).
@@ -91,7 +135,7 @@ export function browseRouter(jwtSecret) {
       let currentUrl = target.href;
       let r;
       for (let hop = 0; ; hop++) {
-        r = await fetch(currentUrl, { signal: ac.signal, redirect: 'manual', headers: fetchHeaders });
+        r = await guardedGet(currentUrl, { signal: ac.signal, headers: fetchHeaders });
         const loc = (r.status >= 300 && r.status < 400) ? r.headers.get('location') : null;
         if (!loc) break;
         if (hop >= 5) throw new Error('Muitos redirecionamentos.');

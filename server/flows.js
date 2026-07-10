@@ -18,6 +18,7 @@ import pkg from 'ssh2';
 const { Client: SSHClient } = pkg;
 import { readTable, writeTable } from './store.js';
 import { verifyHostKey } from './hostkeys.js';
+import { isAllowedKeyPath } from './keypath.js';
 import * as codex from './codexOAuth.js';
 
 const newId = (p = 'f') => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -41,7 +42,10 @@ function connectSSH(host, ownerId) {
       },
       algorithms: { serverHostKey: ['ssh-rsa', 'ssh-ed25519', 'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521', 'rsa-sha2-256', 'rsa-sha2-512'] },
     };
-    if (host.keyPath) { try { cfg.privateKey = fs.readFileSync(host.keyPath); if (host.passphrase) cfg.passphrase = host.passphrase; } catch (e) { return reject(new Error('key read: ' + e.message)); } }
+    if (host.keyPath) {
+      if (!isAllowedKeyPath(host.keyPath)) return reject(new Error('caminho de chave fora do diretório permitido'));
+      try { cfg.privateKey = fs.readFileSync(host.keyPath); if (host.passphrase) cfg.passphrase = host.passphrase; } catch (e) { return reject(new Error('key read: ' + e.message)); }
+    }
     else cfg.password = host.password || '';
     ssh.on('ready', () => resolve(ssh));
     ssh.on('error', (err) => reject(hostKeyError || err));

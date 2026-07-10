@@ -148,7 +148,13 @@ export default function WebBrowser({ onClose, sshSessions = [], defaultSid }) {
             doc != null ? (
               <iframe title="navegador-ssh" srcDoc={doc} onLoad={() => setLoading(false)} className="w-full h-full" style={{ border: 'none', background: '#fff' }} sandbox="allow-scripts allow-forms allow-popups" />
             ) : (
-              <iframe title="navegador" src={proxySrc(url)} onLoad={() => setLoading(false)} className="w-full h-full" style={{ border: 'none', background: '#fff' }} sandbox="allow-scripts allow-forms allow-popups allow-same-origin" />
+              // SEM allow-same-origin: o conteúdo do proxy é servido na MESMA origem
+              // do app (/api/browse); com allow-scripts + allow-same-origin o sandbox
+              // não isolaria nada e o JS de qualquer site navegado rodaria na origem
+              // do Terminal-NG (podendo chamar /api/* com o cookie de sessão e roubar
+              // as credenciais SSH salvas). Sem allow-same-origin o documento fica em
+              // origem opaca: os scripts rodam isolados e não alcançam a sessão/API.
+              <iframe title="navegador" src={proxySrc(url)} onLoad={() => setLoading(false)} className="w-full h-full" style={{ border: 'none', background: '#fff' }} sandbox="allow-scripts allow-forms allow-popups" />
             )
           ) : (
             <div className="h-full overflow-auto p-6">

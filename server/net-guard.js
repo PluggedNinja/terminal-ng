@@ -32,6 +32,32 @@ function ipIsPrivate(ip) {
 }
 
 /**
+ * lookup "guardado" para usar como opção `lookup` de http/https.request.
+ * Revalida o IP NO MOMENTO DA CONEXÃO — fecha a janela de DNS rebinding: mesmo
+ * que o assertPublicUrl tenha validado antes, se o nome for re-resolvido para um
+ * IP interno na conexão real, aqui recusamos.
+ * Assinatura compatível com dns.lookup: (hostname, options?, callback).
+ */
+export function guardedLookup(hostname, options, callback) {
+  const cb = typeof options === 'function' ? options : callback;
+  const opts = (options && typeof options === 'object') ? options : {};
+  dns.lookup(hostname, { ...opts, all: true }, (err, addresses) => {
+    if (err) return cb(err);
+    const list = Array.isArray(addresses) ? addresses : [addresses];
+    for (const a of list) {
+      if (ipIsPrivate(a.address)) {
+        const e = new Error('Destino interno bloqueado (possível DNS rebinding).');
+        e.code = 'EBLOCKED';
+        return cb(e);
+      }
+    }
+    if (opts.all) return cb(null, list);
+    const first = list[0];
+    return cb(null, first.address, first.family);
+  });
+}
+
+/**
  * Valida uma URL e resolve o host. Lança Error se o destino for interno/inválido.
  * Retorna a URL normalizada (com esquema https:// se omitido).
  */

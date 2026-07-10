@@ -201,13 +201,13 @@ RULES:
     try {
       if (codex.getStatus(req.user.id).connected) {
         const { answer } = await codex.chat(req.user.id, { prompt: userMsg, system: sys });
-        return res.json({ mode: 'codex-oauth', ...parseAgent(answer) });
+        return res.json({ mode: 'codex-oauth', ...guardAgentStep(parseAgent(answer)) });
       }
       const cfg = getProviderConfig(req.user.id);
-      if (cfg) { const { answer } = await callChat(cfg, { system: sys, user: userMsg, json: true }); return res.json({ mode: 'live', ...parseAgent(answer) }); }
-      return res.json({ mode: 'offline-heuristic', ...heuristicAgent(goal, steps || [], conclude) });
+      if (cfg) { const { answer } = await callChat(cfg, { system: sys, user: userMsg, json: true }); return res.json({ mode: 'live', ...guardAgentStep(parseAgent(answer)) }); }
+      return res.json({ mode: 'offline-heuristic', ...guardAgentStep(heuristicAgent(goal, steps || [], conclude)) });
     } catch (e) {
-      return res.json({ mode: 'offline-heuristic', ...heuristicAgent(goal, steps || [], conclude), warn: e.message });
+      return res.json({ mode: 'offline-heuristic', ...guardAgentStep(heuristicAgent(goal, steps || [], conclude)), warn: e.message });
     }
   });
 
@@ -398,6 +398,48 @@ function heuristicInsight(command, output) {
     : severity === 'warn' ? `"${base}" ran with something worth checking.`
     : `"${base}" completed.`;
   return { summary, severity, findings, suggestions, command: cmd, offline: true };
+}
+
+// ── Guard server-side do loop autônomo ──
+// Comandos claramente destrutivos NUNCA devem ser executados automaticamente pelo
+// agente. O cliente já filtra (isSafeCommand), mas isso é contornável; aqui o
+// SERVIDOR também recusa — defesa contra prompt-injection vinda da saída dos
+// comandos. Não bloqueia 2>/dev/null etc. (só redirecionamento para dirs de sistema).
+const AGENT_BLOCK_RE = [
+  /\brm\b\s+(?:-\S+\s+)*-[a-z]*[rf][a-z]*/i,                    // rm -rf / -fr…
+  /\brm\b\s+(?:-\S+\s+)*(?:\/|~|\*|\.)(?:\s|$)/i,
+  /\b(mkfs|mke2fs|mkfs\.\w+|wipefs|fdisk|parted|shred)\b/i,
+  /\bdd\b[^|]*\bof=/i,
+  />\s*\/dev\/(sd|nvme|vd|hd|mmcblk|disk)/i,
+  /:\s*\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/,                // fork bomb
+  /\b(shutdown|poweroff|halt|reboot|init\s+[06])\b/i,
+  /(?:^|[;&|]\s*|\bsudo\s+)(useradd|userdel|usermod|groupadd|groupdel|passwd|chpasswd)\b/i, // como COMANDO (não /etc/passwd)
+  /\b(chmod|chown|chgrp|chattr|setfacl)\b\s+-[a-z]*R/i,         // recursivo
+  /\b(iptables|nft|ufw|firewall-cmd)\b/i,
+  /\b(systemctl|service)\b[^|]*\b(start|stop|restart|reload|enable|disable|mask|kill)\b/i,
+  /\b(kill|pkill|killall)\b/i,
+  /\b(mount|umount|swapoff|swapon)\b/i,
+  /\bcrontab\b\s+-[re]/i,
+  /\b(apt|apt-get|yum|dnf|zypper|pacman|snap)\b[^|]*\b(install|remove|purge|autoremove|upgrade|update)\b/i,
+  /\b(pip3?|npm|gem|cargo)\b\s+(install|uninstall|remove)\b/i,
+  /\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(bash|sh|zsh)\b/i,        // pipe p/ shell
+  /\btee\b[^|]*\s\/(?:etc|var|usr|bin|sbin|lib|boot|root)/i,
+  />>?\s*\/(?:etc|var|usr|bin|sbin|lib|lib64|boot|root|opt|srv|proc|sys|run)\b/i, // redirect p/ dir de sistema (dev fica com as regras de disco; permite 2>/dev/null)
+  /\bgit\b\s+(push|reset\s+--hard|clean\s+-\S*f)/i,
+];
+function agentCmdBlocked(cmd) { const s = String(cmd || ''); return AGENT_BLOCK_RE.some((re) => re.test(s)); }
+function guardAgentStep(step) {
+  if (step && step.done === false && step.command && agentCmdBlocked(step.command)) {
+    const bad = String(step.command).slice(0, 300);
+    return {
+      ...step,
+      command: `echo '[bloqueado pelo servidor: comando nao e somente-leitura]'`,
+      serverBlocked: true,
+      blockedCommand: bad,
+      thought: (step.thought ? step.thought + ' ' : '') + '[servidor recusou um comando que não é somente-leitura]',
+    };
+  }
+  return step;
 }
 
 // Parse the agent step JSON defensively.
