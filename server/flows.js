@@ -17,24 +17,35 @@ import fs from 'node:fs';
 import pkg from 'ssh2';
 const { Client: SSHClient } = pkg;
 import { readTable, writeTable } from './store.js';
+import { verifyHostKey } from './hostkeys.js';
 import * as codex from './codexOAuth.js';
 
 const newId = (p = 'f') => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
 // ─── SSH helpers ───────────────────────────────────────────────────────────
-function connectSSH(host) {
+function connectSSH(host, ownerId) {
   return new Promise((resolve, reject) => {
     const ssh = new SSHClient();
+    const port = parseInt(host.port, 10) || 22;
+    const hostKeyId = `${host.ip}:${port}`;
+    let hostKeyError = null;
     const cfg = {
-      host: host.ip, port: parseInt(host.port, 10) || 22, username: host.username,
-      readyTimeout: 12000, keepaliveInterval: 10000, hostVerifier: () => true,
+      host: host.ip, port, username: host.username,
+      readyTimeout: 12000, keepaliveInterval: 10000,
+      // TOFU (mesma tabela knownhosts da sessão interativa — ver hostkeys.js):
+      // aceita e memoriza na 1ª conexão; recusa se a host key mudar depois (MITM).
+      hostVerifier: (keyBuf) => {
+        const v = verifyHostKey(ownerId, hostKeyId, keyBuf);
+        if (!v.ok) hostKeyError = new Error(`a chave do servidor ${hostKeyId} MUDOU desde o último acesso — possível man-in-the-middle. Conexão recusada. Se a mudança for legítima, remova o host conhecido para reconfiar.`);
+        return v.ok;
+      },
       algorithms: { serverHostKey: ['ssh-rsa', 'ssh-ed25519', 'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521', 'rsa-sha2-256', 'rsa-sha2-512'] },
     };
     if (host.keyPath) { try { cfg.privateKey = fs.readFileSync(host.keyPath); if (host.passphrase) cfg.passphrase = host.passphrase; } catch (e) { return reject(new Error('key read: ' + e.message)); } }
     else cfg.password = host.password || '';
     ssh.on('ready', () => resolve(ssh));
-    ssh.on('error', reject);
-    try { ssh.connect(cfg); } catch (e) { reject(e); }
+    ssh.on('error', (err) => reject(hostKeyError || err));
+    try { ssh.connect(cfg); } catch (e) { reject(hostKeyError || e); }
   });
 }
 
@@ -113,7 +124,7 @@ async function runFlow(flow, ownerId) {
   if (!host.password && !host.keyPath) { run.status = 'error'; run.error = 'Host sem credencial salva — marque "store pw" no host para rodar sem o app.'; run.finishedAt = new Date().toISOString(); saveRun(ownerId, run); return run; }
 
   let ssh;
-  try { ssh = await connectSSH(host); }
+  try { ssh = await connectSSH(host, ownerId); }
   catch (e) { run.status = 'error'; run.error = 'Falha SSH: ' + (e.message || e); run.finishedAt = new Date().toISOString(); saveRun(ownerId, run); return run; }
 
   try {
