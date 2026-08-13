@@ -51,10 +51,10 @@ const TraceParseOverlay = ({ dest, hops = [], auto, pinned, onClose, onClear, on
   const isFloat = card.floating;
 
   const body = (
-    <motion.div {...card.dragProps}
+    <motion.div ref={card.rootRef} {...card.dragProps}
       initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
       className={`${isFloat ? 'fixed top-3 right-3 bottom-3 z-[9997]' : 'absolute top-2 right-2 bottom-2 z-30'} w-[340px] flex flex-col rounded-xl overflow-hidden`}
-      style={{ background: 'color-mix(in srgb, var(--bg-2) 92%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-primary) 25%, transparent)', backdropFilter: 'blur(6px)' }}
+      style={{ background: 'color-mix(in srgb, var(--bg-2) 92%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-primary) 25%, transparent)', backdropFilter: 'blur(6px)', ...card.resizeStyle }}
     >
       <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
         <div className="flex items-center gap-2 min-w-0">
@@ -133,7 +133,7 @@ const TraceParseOverlay = ({ dest, hops = [], auto, pinned, onClose, onClear, on
       )}
 
       {/* timeline */}
-      <div className="flex-1 overflow-y-auto px-3 py-2">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2">
         {hops.length === 0 ? (
           <p className="text-[10px] text-slate-500 text-center mt-4">Rode <span className="font-mono text-slate-400">traceroute {'<host>'}</span> que eu desenho a rota aqui.</p>
         ) : (

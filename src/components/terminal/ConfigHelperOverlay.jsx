@@ -57,12 +57,12 @@ const ConfigHelperOverlay = ({ type, fileName, help, onClose, floating, sessionL
   const isFloat = card.floating;
 
   const body = (
-    <motion.div {...card.dragProps}
+    <motion.div ref={card.rootRef} {...card.dragProps}
       initial={{ opacity: 0, x: 30 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 30 }}
       className={`${isFloat ? 'fixed top-3 right-3 bottom-3 z-[9997]' : 'absolute top-2 right-2 bottom-2 z-30'} flex flex-col rounded-xl overflow-hidden shadow-2xl backdrop-blur-sm`}
-      style={{ width: isFloat ? 360 : 'min(360px, 48%)', background: 'color-mix(in srgb, var(--bg-2) 96%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-secondary) 30%, transparent)' }}
+      style={{ width: isFloat ? 360 : 'min(360px, 48%)', background: 'color-mix(in srgb, var(--bg-2) 96%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-secondary) 30%, transparent)', ...card.resizeStyle }}
     >
       <div className="flex items-center justify-between px-3 py-1.5 shrink-0" style={{ borderBottom: '1px solid rgba(148,163,184,0.15)' }}>
         <div className="flex items-center gap-2 min-w-0">
@@ -84,7 +84,7 @@ const ConfigHelperOverlay = ({ type, fileName, help, onClose, floating, sessionL
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto">
       {doc && <p className="px-3 pt-1.5 text-[9px] leading-snug" style={{ color: 'var(--text-dim)' }}>{doc}</p>}
 
       <div className="px-3 py-2 min-h-[52px]">

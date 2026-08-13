@@ -6,6 +6,7 @@ import {
   AlertTriangle, Network, Gauge as GaugeIcon, Layers, Clock, Loader2,
 } from 'lucide-react';
 
+import { useOverlayCard, CardControls } from './terminal/overlayCard';
 /* ── helpers ─────────────────────────────────────────────────────────── */
 function fmtBytes(b) {
   if (b == null || isNaN(b)) return '–';
@@ -74,17 +75,19 @@ function Panel({ icon: Icon, title, accent, children, className = '' }) {
 }
 
 /* ── dashboard ───────────────────────────────────────────────────────── */
-export default function SystemDashboard({ open, data, loading, onClose, onRefresh, hostName, color }) {
+export default function SystemDashboard({ open, data, loading, onClose, onRefresh, hostName, color, floating = true }) {
   const accent = color || 'var(--cyber-primary)';
   const cpu = data ? (data.cpuPct ?? data.loadPct ?? 0) : 0;
-  return createPortal(
+  const card = useOverlayCard(floating);
+  const isFloat = card.floating;
+  const body = (
     <AnimatePresence>
       {open && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[9998] grid place-items-center p-4"
-          style={{ background: 'rgba(2,3,8,0.78)', backdropFilter: 'blur(6px)' }} onClick={onClose}>
-          <motion.div initial={{ scale: 0.94, y: 14, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }}
-            className="glass clip-cyber w-full" style={{ maxWidth: 920, maxHeight: '88vh', overflow: 'auto' }}
+          className={`${isFloat ? 'fixed' : 'absolute pointer-events-none'} inset-0 z-[9998] grid place-items-center p-4`}
+          style={isFloat ? { background: 'rgba(2,3,8,0.78)', backdropFilter: 'blur(6px)' } : undefined} onClick={isFloat ? onClose : undefined}>
+          <motion.div ref={card.rootRef} {...card.dragProps} initial={{ scale: 0.94, y: 14, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} exit={{ scale: 0.96, opacity: 0 }}
+            className="glass clip-cyber pointer-events-auto" style={{ width: isFloat ? 'min(920px, calc(100vw - 2rem))' : 'min(920px, calc(100% - 2rem))', maxWidth: 'calc(100% - 2rem)', maxHeight: 'calc(100% - 2rem)', overflow: 'auto', ...card.resizeStyle }}
             onClick={(e) => e.stopPropagation()}>
             {/* header */}
             <div className="flex items-center gap-3 px-5 py-3 sticky top-0 z-10" style={{ borderBottom: `1px solid ${accent}33`, background: 'rgba(6,9,18,0.92)', backdropFilter: 'blur(8px)' }}>
@@ -100,6 +103,7 @@ export default function SystemDashboard({ open, data, loading, onClose, onRefres
               <button onClick={onRefresh} title="atualizar" className="p-1.5 rounded hover:bg-theme-soft">
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} style={{ color: 'var(--text-dim)' }} />
               </button>
+              <CardControls card={card} />
               <button onClick={onClose}><X className="w-5 h-5" style={{ color: 'var(--text-dim)' }} /></button>
             </div>
 
@@ -236,9 +240,9 @@ export default function SystemDashboard({ open, data, loading, onClose, onRefres
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>,
-    document.body
+    </AnimatePresence>
   );
+  return isFloat ? createPortal(body, document.body) : body;
 }
 
 function Row({ k, v }) {

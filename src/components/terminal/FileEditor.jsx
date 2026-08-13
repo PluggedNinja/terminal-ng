@@ -12,8 +12,9 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { FileText, Save, X, Search, Replace, Loader2, AlertTriangle, ChevronUp, ChevronDown, Copy, Scissors, ClipboardPaste, CheckCheck } from 'lucide-react';
 import { basename } from '../../lib/sftpUtil';
+import { useOverlayCard, CardControls } from './overlayCard';
 
-export default function FileEditor({ api, path, onClose, onSaved }) {
+export default function FileEditor({ api, path, onClose, onSaved, floating = true }) {
   const [text, setText] = useState('');
   const [orig, setOrig] = useState('');
   const [loading, setLoading] = useState(true);
@@ -119,16 +120,19 @@ export default function FileEditor({ api, path, onClose, onSaved }) {
     } catch { setMatchInfo('cole com Ctrl+V (permissão de área de transferência negada)'); }
   };
 
+  const card = useOverlayCard(floating);
+  const isFloat = card.floating;
   const body = (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[10010] grid place-items-center p-4" style={{ background: 'rgba(2,3,8,0.8)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
-      <div className="glass flex flex-col w-full max-w-4xl" style={{ height: '86vh', borderRadius: 12, background: 'color-mix(in srgb, var(--bg-2) 98%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-primary) 30%, transparent)' }}
+      className={`${isFloat ? 'fixed' : 'absolute pointer-events-none'} inset-0 z-[10010] grid place-items-center p-4`} style={isFloat ? { background: 'rgba(2,3,8,0.8)', backdropFilter: 'blur(4px)' } : undefined} onClick={isFloat ? onClose : undefined}>
+      <motion.div ref={card.rootRef} {...card.dragProps} className="glass pointer-events-auto flex flex-col overflow-hidden" style={{ width: isFloat ? 'min(896px, calc(100vw - 2rem))' : 'min(896px, calc(100% - 2rem))', height: isFloat ? '86vh' : 'calc(100% - 2rem)', maxWidth: 'calc(100% - 2rem)', maxHeight: 'calc(100% - 2rem)', borderRadius: 12, background: 'color-mix(in srgb, var(--bg-2) 98%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-primary) 30%, transparent)', ...card.resizeStyle }}
         onClick={(e) => e.stopPropagation()}>
 
         {/* header */}
         <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
           <FileText className="w-4 h-4 text-theme shrink-0" />
           <span className="font-mono text-[12px] text-theme flex-1 truncate" title={path}>{path}{dirty ? ' •' : ''}</span>
+          <CardControls card={card} />
           <button onClick={() => setFindOpen((v) => !v)} title="Buscar / substituir (Ctrl+F)" className="p-1 rounded hover:bg-theme-soft" style={{ color: findOpen ? 'var(--cyber-primary)' : 'var(--text-dim)' }}><Search className="w-4 h-4" /></button>
           <div className="w-px h-4 mx-0.5" style={{ background: 'rgba(255,255,255,0.1)' }} />
           <button onClick={doCopy} title="Copiar seleção" className="p-1 rounded hover:bg-theme-soft text-theme-soft"><Copy className="w-3.5 h-3.5" /></button>
@@ -189,8 +193,8 @@ export default function FileEditor({ api, path, onClose, onSaved }) {
           <div className="flex-1" />
           <span>{dirty ? 'modificado' : 'salvo'}</span>
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   );
-  return createPortal(body, document.body);
+  return isFloat ? createPortal(body, document.body) : body;
 }

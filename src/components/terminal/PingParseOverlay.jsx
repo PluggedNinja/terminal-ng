@@ -51,10 +51,10 @@ const PingParseOverlay = ({ samples = [], auto, pinned, onClose, onClear, onTogg
   const isFloat = card.floating;
 
   const body = (
-    <motion.div {...card.dragProps}
+    <motion.div ref={card.rootRef} {...card.dragProps}
       initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }}
-      className={`${isFloat ? 'fixed top-3 right-3 bottom-3 z-[9997]' : 'absolute top-2 right-2 bottom-2 z-30'} flex flex-col rounded-xl border shadow-2xl backdrop-blur-sm`}
-      style={{ width: isFloat ? 360 : 'min(360px, 48%)', borderColor: 'color-mix(in srgb, var(--cyber-primary) 25%, transparent)', background: 'color-mix(in srgb, var(--bg-2) 93%, transparent)' }}>
+      className={`${isFloat ? 'fixed top-3 right-3 bottom-3 z-[9997]' : 'absolute top-2 right-2 bottom-2 z-30'} flex flex-col overflow-hidden rounded-xl border shadow-2xl backdrop-blur-sm`}
+      style={{ width: isFloat ? 360 : 'min(360px, 48%)', borderColor: 'color-mix(in srgb, var(--cyber-primary) 25%, transparent)', background: 'color-mix(in srgb, var(--bg-2) 93%, transparent)', ...card.resizeStyle }}>
       {/* header */}
       <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'color-mix(in srgb, var(--cyber-primary) 15%, transparent)' }}>
         <div className="flex items-center gap-1.5 min-w-0">
@@ -77,7 +77,7 @@ const PingParseOverlay = ({ samples = [], auto, pinned, onClose, onClear, onTogg
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-3 space-y-3">
+      <div className="flex-1 min-h-0 overflow-auto p-3 space-y-3">
         {s.host && <div className="text-[11px] text-slate-400">destino <span className="font-mono text-slate-200">{s.host}</span></div>}
 
         {/* qualidade */}

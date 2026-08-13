@@ -18,10 +18,11 @@ import {
   modeToSymbolic, modeToOctal, parseModeInput, isTextFile,
 } from '../../lib/sftpUtil';
 import FileEditor from './FileEditor';
+import { useOverlayCard, CardControls } from './overlayCard';
 
 let xferSeq = 0;
 
-export default function FileBrowser({ api, sessionLabel, onClose }) {
+export default function FileBrowser({ api, sessionLabel, onClose, floating = true }) {
   const [cwd, setCwd] = useState('/');
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -139,12 +140,13 @@ export default function FileBrowser({ api, sessionLabel, onClose }) {
   const iconFor = (e) => (e.isLink ? Link2 : e.isDir ? Folder : isTextFile(e.name) ? FileText : FileIcon);
   const crumbs = breadcrumbs(cwd);
 
+  const card = useOverlayCard(floating);
+  const isFloat = card.floating;
   const body = (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[10006] grid place-items-center p-4" style={{ background: 'rgba(2,3,8,0.74)', backdropFilter: 'blur(5px)' }}
-      onClick={onClose}>
-      <motion.div initial={{ scale: 0.97, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.97, opacity: 0 }}
-        className="glass clip-cyber w-full max-w-5xl flex flex-col" style={{ maxHeight: '88vh', height: '88vh', background: 'color-mix(in srgb, var(--bg-2) 97%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-primary) 28%, transparent)', borderRadius: 14 }}
+      className={`${isFloat ? 'fixed' : 'absolute pointer-events-none'} inset-0 z-[10006] grid place-items-center p-4`} style={isFloat ? { background: 'rgba(2,3,8,0.74)', backdropFilter: 'blur(5px)' } : undefined} onClick={isFloat ? onClose : undefined}>
+      <motion.div ref={card.rootRef} {...card.dragProps} initial={{ scale: 0.97, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.97, opacity: 0 }}
+        className="glass clip-cyber pointer-events-auto flex flex-col overflow-hidden" style={{ width: isFloat ? 'min(1024px, calc(100vw - 2rem))' : 'min(1024px, calc(100% - 2rem))', height: isFloat ? '88vh' : 'calc(100% - 2rem)', maxWidth: 'calc(100% - 2rem)', maxHeight: 'calc(100% - 2rem)', background: 'color-mix(in srgb, var(--bg-2) 97%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-primary) 28%, transparent)', borderRadius: 14, ...card.resizeStyle }}
         onClick={(e) => e.stopPropagation()}>
 
         {/* header */}
@@ -154,6 +156,7 @@ export default function FileBrowser({ api, sessionLabel, onClose }) {
             <div className="font-display font-bold tracking-cyber text-theme leading-tight text-[14px]">Arquivos · SFTP</div>
             <div className="text-[10px] truncate" style={{ color: 'var(--text-dim)' }}>{sessionLabel ? `${sessionLabel} · ` : ''}transfira arquivos entre o servidor e sua máquina</div>
           </div>
+          <CardControls card={card} />
           <button onClick={onClose} title="Fechar" className="p-1 rounded hover:bg-theme-soft"><X className="w-5 h-5" style={{ color: 'var(--text-dim)' }} /></button>
         </div>
 
@@ -281,11 +284,11 @@ export default function FileBrowser({ api, sessionLabel, onClose }) {
 
       {/* editor de texto (componente compartilhado: números de linha, busca, etc.) */}
       {editPath && (
-        <FileEditor api={api} path={editPath} onClose={() => setEditPath(null)} onSaved={() => load(cwd)} />
+        <FileEditor api={api} path={editPath} onClose={() => setEditPath(null)} onSaved={() => load(cwd)} floating={isFloat} />
       )}
     </motion.div>
   );
-  return createPortal(body, document.body);
+  return isFloat ? createPortal(body, document.body) : body;
 }
 
 function TbBtn({ icon: Icon, title, onClick, accent, active, spin }) {

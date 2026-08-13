@@ -12,14 +12,15 @@ import { motion } from 'framer-motion';
 import {
   Pin, PinOff, X, Trash2, ChevronDown, Sparkles, Loader2,
   Plug, Network, Route, Shield, Cpu, MemoryStick, Gauge, Folder, HardDrive,
-  ScrollText, Globe, AlertTriangle, Settings, Terminal,
+  ScrollText, Globe, AlertTriangle, Settings, Terminal, Monitor,
 } from 'lucide-react';
 import { useOverlayCard, CardControls } from './overlayCard';
+import ScreenSessionsSection from './ScreenSessionsSection';
 
 const ICONS = {
   plug: Plug, network: Network, route: Route, shield: Shield, cpu: Cpu, memory: MemoryStick,
   gauge: Gauge, folder: Folder, hardDrive: HardDrive, scroll: ScrollText, globe: Globe,
-  alert: AlertTriangle, settings: Settings, terminal: Terminal,
+  alert: AlertTriangle, settings: Settings, terminal: Terminal, screen: Monitor,
 };
 
 const toneColor = (t) => ({
@@ -37,8 +38,11 @@ function Bar({ pct, tone }) {
   );
 }
 
-function Section({ s, onOpenFile }) {
+function Section({ s, onOpenFile, onRunCommand }) {
   if (!s) return null;
+  if (s.type === 'screenSessions') {
+    return <ScreenSessionsSection data={s} onRunCommand={onRunCommand} />;
+  }
   if (s.type === 'filelist') {
     return (
       <div className="flex flex-wrap gap-1.5">
@@ -211,16 +215,16 @@ function Section({ s, onOpenFile }) {
 
 export default function ToolParseOverlay({
   data, auto, pinned, onTogglePin, onClose, onClear, floating, sessionLabel,
-  picker, onPick, aiBusy, onAnalyzeAi, onOpenFile,
+  picker, onPick, aiBusy, onAnalyzeAi, onOpenFile, onRunCommand,
 }) {
   const Icon = (data && ICONS[data.icon]) || Terminal;
   const title = (data && data.title) || 'Diagnóstico';
   const card = useOverlayCard(floating);
   const isFloat = card.floating;
   const body = (
-    <motion.div {...card.dragProps} initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }}
-      className={`${isFloat ? 'fixed right-3 bottom-3 z-[9997]' : 'absolute right-2 bottom-2 z-30'} rounded-xl overflow-hidden`}
-      style={{ width: 500, maxWidth: isFloat ? '94vw' : 'calc(100% - 1rem)', maxHeight: isFloat ? '82vh' : '74%', background: 'color-mix(in srgb, var(--bg-2) 96%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-primary) 30%, transparent)', backdropFilter: 'blur(8px)', boxShadow: '0 16px 50px rgba(0,0,0,0.6), 0 0 24px color-mix(in srgb, var(--cyber-primary) 12%, transparent)' }}>
+    <motion.div ref={card.rootRef} {...card.dragProps} initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }}
+      className={`${isFloat ? 'fixed right-3 bottom-3 z-[9997]' : 'absolute right-2 bottom-2 z-30'} flex flex-col rounded-xl overflow-hidden`}
+      style={{ width: 500, maxWidth: isFloat ? '94vw' : 'calc(100% - 1rem)', maxHeight: isFloat ? '82vh' : '74%', background: 'color-mix(in srgb, var(--bg-2) 96%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-primary) 30%, transparent)', backdropFilter: 'blur(8px)', boxShadow: '0 16px 50px rgba(0,0,0,0.6), 0 0 24px color-mix(in srgb, var(--cyber-primary) 12%, transparent)', ...card.resizeStyle }}>
       <div className="flex items-center justify-between px-3 py-1.5" style={{ borderBottom: '1px solid rgba(0,240,255,0.15)' }}>
         <div className="flex items-center gap-2 min-w-0">
           <Icon className="w-3.5 h-3.5 text-theme shrink-0" />
@@ -258,8 +262,8 @@ export default function ToolParseOverlay({
           <button onClick={onClose} title="Fechar" className="p-1 rounded hover:bg-black/40"><X className="w-3.5 h-3.5" style={{ color: 'var(--cyber-danger)' }} /></button>
         </div>
       </div>
-      <div className="p-3 overflow-y-auto space-y-3" style={{ maxHeight: 'calc(82vh - 40px)' }}>
-        {data && data.sections ? data.sections.map((s, i) => <Section key={i} s={s} onOpenFile={onOpenFile} />)
+      <div className="flex-1 min-h-0 p-3 overflow-y-auto space-y-3">
+        {data && data.sections ? data.sections.map((s, i) => <Section key={i} s={s} onOpenFile={onOpenFile} onRunCommand={onRunCommand} />)
           : <div className="font-mono text-[11px] py-6 text-center" style={{ color: 'var(--text-dim)' }}>Rode um comando de diagnóstico (ss, ip, ps, free, journalctl, dmesg…) para ver a análise aqui.</div>}
       </div>
     </motion.div>

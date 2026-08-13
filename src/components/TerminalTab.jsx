@@ -115,7 +115,7 @@ const TerminalTab = forwardRef(({ session, isVisible, onActivity, onInput, termS
   const c = session.connectionParams.color || '#00f0ff';
 
   return (
-    <div className="h-full flex flex-col" style={{ display: isVisible ? 'flex' : 'none' }}>
+    <div className="relative h-full flex flex-col" style={{ display: isVisible ? 'flex' : 'none' }}>
       {/* status header */}
       <div className="flex items-center gap-3 px-4 py-2 border-b" style={{ borderColor: aiControlled ? 'color-mix(in srgb, var(--cyber-secondary) 45%, transparent)' : 'rgba(0,240,255,0.15)' }}>
         <span className={`status-dot ${dotClass}`} style={status === 'connected' ? { background: c, boxShadow: `0 0 10px ${c}` } : undefined} />

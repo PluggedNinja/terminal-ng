@@ -132,6 +132,7 @@ export function toolKindForCmd(cmd) {
   if (/^(lsof)\b/.test(c)) return 'lsof';
   if (/^(uptime|w)\b/.test(c)) return 'uptime';
   if (/^last\b/.test(c)) return 'last';
+  if (/(?:^|;\s*)screen\s+(?:-ls|-list|--list)\b/.test(c)) return 'screen';
   if (/^ls\b/.test(c)) return 'ls'; // só `ls` (não lsblk/lsof/lsattr — sem boundary após "ls")
   // logs por arquivo (cat/tail/grep em caminhos conhecidos)
   if (/^(cat|tail|head|grep|less|bat|zcat)\b/.test(c)) {
@@ -918,6 +919,66 @@ function parseLs(lines, _streaming, opts = {}) {
   return { title, icon: 'folder', sections: [{ type: 'filelist', items }] };
 }
 
+// GNU Screen — sessões existentes e ações interativas no overlay.
+// Formatos observados:
+//   1234.nome  (Detached)
+//   1234.nome  (08/13/2026 10:30:00 AM)  (Attached)
+//   No Sockets found in /run/screen/S-user.
+function parseScreen(lines) {
+  const L = clean(lines);
+  if (!L.length) return null;
+  const looksLikeListing = L.some((ln) => /(?:There (?:is a screen|are screens)|Sockets? (?:in|found)|No Sockets found)/i.test(ln)
+    || /^\s*\d+\.\S+.*\((?:Attached|Detached|Multi|Dead|Remote|Removed)/i.test(ln));
+  if (!looksLikeListing) return null;
+  // Comandos de ação podem terminar em `; screen -ls`. Nesse caso, usa
+  // apenas a listagem final para não preservar dados anteriores à ação.
+  const markerIndexes = L.map((ln, index) => /^(?:There (?:is a screen|are screens)|No Sockets found)/i.test(ln.trim()) ? index : -1)
+    .filter((index) => index >= 0);
+  const scanLines = markerIndexes.length ? L.slice(markerIndexes[markerIndexes.length - 1]) : L;
+
+  const sessions = [];
+  let socketDir = '';
+  let reportedCount = null;
+  for (const raw of scanLines) {
+    const ln = raw.trim();
+    let m = ln.match(/^(\d+)\.([^\s(]+)(.*)$/);
+    if (m) {
+      const groups = [...m[3].matchAll(/\(([^)]+)\)/g)].map((x) => x[1].trim());
+      const statusRaw = groups.find((x) => /^(?:Attached|Detached|Multi|Dead|Remote|Removed)/i.test(x)) || '';
+      if (!statusRaw) continue;
+      const lower = statusRaw.toLowerCase();
+      const status = /dead|removed/.test(lower) ? 'dead'
+        : /detached/.test(lower) ? 'detached'
+          : /multi/.test(lower) ? 'multi'
+            : /attached/.test(lower) ? 'attached' : 'remote';
+      const date = groups.find((x) => x !== statusRaw) || '';
+      sessions.push({
+        id: `${m[1]}.${m[2]}`,
+        pid: m[1],
+        name: m[2],
+        status,
+        statusLabel: statusRaw,
+        date,
+      });
+      continue;
+    }
+    m = ln.match(/^(\d+)\s+Sockets?\s+in\s+(.+?)\.?$/i);
+    if (m) { reportedCount = Number(m[1]); socketDir = m[2].replace(/\.$/, ''); continue; }
+    m = ln.match(/^No Sockets found in\s+(.+?)\.?$/i);
+    if (m) { reportedCount = 0; socketDir = m[1].replace(/\.$/, ''); }
+  }
+
+  const order = { detached: 0, attached: 1, multi: 2, remote: 3, dead: 4 };
+  sessions.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || a.name.localeCompare(b.name));
+  return {
+    title: 'Sessões · GNU Screen', icon: 'screen',
+    sections: [{
+      type: 'screenSessions', sessions, socketDir,
+      reportedCount: reportedCount == null ? sessions.length : reportedCount,
+    }],
+  };
+}
+
 // tcpdump — captura de pacotes (streaming até Ctrl-C)
 function parseTcpdump(lines, streaming) {
   const L = clean(lines);
@@ -1040,7 +1101,7 @@ const PARSERS = {
   du: parseDu, smartctl: parseSmartctl, journal: parseJournal, dmesg: parseDmesg,
   weblog: parseWebAccess, weberr: parseWebError, authlog: parseAuthLog, syslog: parseSyslog,
   systemctl: parseSystemctl, analyze: parseAnalyze, lsof: parseLsof, uptime: parseUptime, last: parseLast,
-  health: parseHealth, ls: parseLs, tcpdump: parseTcpdump,
+  health: parseHealth, ls: parseLs, screen: parseScreen, tcpdump: parseTcpdump,
 };
 
 export const TOOL_LABELS = {
@@ -1050,7 +1111,7 @@ export const TOOL_LABELS = {
   smartctl: 'SMART (smartctl)', journal: 'journalctl', dmesg: 'Kernel (dmesg)',
   weblog: 'Acesso web', weberr: 'Erros web', authlog: 'Autenticação', syslog: 'syslog',
   systemctl: 'Serviços (systemctl)', analyze: 'Boot (systemd-analyze)', lsof: 'lsof',
-  uptime: 'Carga (uptime/w)', last: 'Logins (last)', tcpdump: 'Pacotes (tcpdump)',
+  uptime: 'Carga (uptime/w)', last: 'Logins (last)', screen: 'Sessões (screen -ls)', tcpdump: 'Pacotes (tcpdump)',
 };
 
 /** Tipos de log que aceitam captura contínua (tail -f, journalctl -f, dmesg -w). */

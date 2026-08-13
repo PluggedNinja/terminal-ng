@@ -1178,6 +1178,22 @@ const XTerminal = forwardRef(({ wsUrl, connectionParams, credentials, onStatusCh
   const enableTool = () => { toolOnRef.current = true; setToolOn(true); };
   const disableTool = () => { toolOnRef.current = false; setToolOn(false); setToolAuto(false); setToolPinned(false); };
   const clearTool = () => { toolDataRef.current = null; setToolData(null); };
+  // Executa ações geradas por overlays no mesmo PTY do usuário. Ctrl-U limpa
+  // qualquer texto parcial no prompt antes de inserir o comando completo.
+  const runToolCommand = (command, options = {}) => {
+    const ws = wsRef.current;
+    const line = String(command || '').trim();
+    if (!line || !ws || ws.readyState !== WebSocket.OPEN) return false;
+    inputLineRef.current = '';
+    typedCmdRef.current = line;
+    lsLinkActiveRef.current = false;
+    ws.send(JSON.stringify({ type: 'input', data: '\x15' + line + '\r' }));
+    if (options.close !== false) disableTool();
+    setTimeout(() => {
+      try { termInstanceRef.current?.focus(); } catch {}
+    }, 0);
+    return true;
+  };
   // Exec em segundo plano (canal SSH separado) — não polui o terminal.
   const runBgExec = (command) => new Promise((resolve, reject) => {
     const ws = wsRef.current;
@@ -1373,6 +1389,7 @@ const XTerminal = forwardRef(({ wsUrl, connectionParams, credentials, onStatusCh
             pinned={toolPinned} onTogglePin={() => setToolPinned((v) => !v)}
             aiBusy={aiBusy} onAnalyzeAi={analyzeWithAI}
             onOpenFile={openRemoteFile}
+            onRunCommand={runToolCommand}
             onClose={disableTool} onClear={clearTool} floating={floatOverlays} sessionLabel={sessionLabel} />
         )}
       </AnimatePresence>

@@ -155,9 +155,9 @@ export default function StorageOverlay({ data, auto, pinned, onTogglePin, onClos
   const card = useOverlayCard(floating);
   const isFloat = card.floating;
   const body = (
-    <motion.div {...card.dragProps} initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }}
-      className={`${isFloat ? 'fixed right-3 bottom-3 z-[9997]' : 'absolute right-2 bottom-2 z-30'} rounded-xl overflow-hidden`}
-      style={{ width: 460, maxWidth: isFloat ? '92vw' : 'calc(100% - 1rem)', maxHeight: isFloat ? '80vh' : '70%', background: 'color-mix(in srgb, var(--bg-2) 96%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-primary) 30%, transparent)', backdropFilter: 'blur(8px)', boxShadow: '0 16px 50px rgba(0,0,0,0.6), 0 0 24px color-mix(in srgb, var(--cyber-primary) 12%, transparent)' }}>
+    <motion.div ref={card.rootRef} {...card.dragProps} initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }}
+      className={`${isFloat ? 'fixed right-3 bottom-3 z-[9997]' : 'absolute right-2 bottom-2 z-30'} flex flex-col rounded-xl overflow-hidden`}
+      style={{ width: 460, maxWidth: isFloat ? '92vw' : 'calc(100% - 1rem)', maxHeight: isFloat ? '80vh' : '70%', background: 'color-mix(in srgb, var(--bg-2) 96%, transparent)', border: '1px solid color-mix(in srgb, var(--cyber-primary) 30%, transparent)', backdropFilter: 'blur(8px)', boxShadow: '0 16px 50px rgba(0,0,0,0.6), 0 0 24px color-mix(in srgb, var(--cyber-primary) 12%, transparent)', ...card.resizeStyle }}>
       <div className="flex items-center justify-between px-3 py-1.5" style={{ borderBottom: '1px solid rgba(0,240,255,0.15)' }}>
         <div className="flex items-center gap-2 min-w-0">
           <Icon className="w-3.5 h-3.5 text-theme shrink-0" />
@@ -172,7 +172,7 @@ export default function StorageOverlay({ data, auto, pinned, onTogglePin, onClos
           <button onClick={onClose} title="Close" className="p-1 rounded hover:bg-black/40"><X className="w-3.5 h-3.5" style={{ color: 'var(--cyber-danger)' }} /></button>
         </div>
       </div>
-      <div className="p-3 overflow-y-auto" style={{ maxHeight: 'calc(70vh - 40px)' }}>
+      <div className="flex-1 min-h-0 p-3 overflow-y-auto">
         <Body data={data} />
       </div>
     </motion.div>

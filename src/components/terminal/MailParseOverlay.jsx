@@ -187,10 +187,10 @@ const MailParseOverlay = ({ events, counts, auto, pinned, onClose, onClear, onTo
   const isFloat = card.floating;
 
   const body = (
-    <motion.div {...card.dragProps}
+    <motion.div ref={card.rootRef} {...card.dragProps}
       initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }}
-      className={`${isFloat ? 'fixed top-3 right-3 bottom-3 z-[9997]' : 'absolute top-2 right-2 bottom-2 z-30'} flex flex-col rounded-xl border shadow-2xl backdrop-blur-sm`}
-      style={{ width: isFloat ? 360 : 'min(360px, 46%)', borderColor: 'color-mix(in srgb, var(--cyber-primary) 25%, transparent)', background: 'color-mix(in srgb, var(--bg-2) 92%, transparent)' }}>
+      className={`${isFloat ? 'fixed top-3 right-3 bottom-3 z-[9997]' : 'absolute top-2 right-2 bottom-2 z-30'} flex flex-col overflow-hidden rounded-xl border shadow-2xl backdrop-blur-sm`}
+      style={{ width: isFloat ? 360 : 'min(360px, 46%)', borderColor: 'color-mix(in srgb, var(--cyber-primary) 25%, transparent)', background: 'color-mix(in srgb, var(--bg-2) 92%, transparent)', ...card.resizeStyle }}>
       {/* header */}
       <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'color-mix(in srgb, var(--cyber-primary) 15%, transparent)' }}>
         <div className="flex items-center gap-1.5 min-w-0">
@@ -280,7 +280,7 @@ const MailParseOverlay = ({ events, counts, auto, pinned, onClose, onClear, onTo
 
       {/* corpo: lista OU histórico do e-mail */}
       {detailEv ? (
-        <div className="flex-1 overflow-auto px-2.5 py-2">
+        <div className="flex-1 min-h-0 overflow-auto px-2.5 py-2">
           <button onClick={() => setDetailEv(null)} className="flex items-center gap-1 text-[10px] text-theme hover:brightness-125 mb-2">
             <ChevronLeft className="w-3.5 h-3.5" /> voltar à lista
           </button>
@@ -301,7 +301,7 @@ const MailParseOverlay = ({ events, counts, auto, pinned, onClose, onClear, onTo
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-auto px-2.5 py-2">
+        <div className="flex-1 min-h-0 overflow-auto px-2.5 py-2">
           {filtered.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 px-4">
               <Mail className="w-7 h-7 mb-2 opacity-40" />
